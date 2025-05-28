@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ShoppingCart, Plus, Minus, ArrowLeft, Package, Star, Sparkles } from 'lucide-react';
+import { Search, ShoppingCart, Plus, Minus, ArrowLeft, Package, Star, Sparkles, Gift } from 'lucide-react';
+
 const App = () => {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -25,7 +26,7 @@ const App = () => {
         const data = await response.json();
         
         // Ensure all numeric fields are properly converted
-       const processedData = data.map(product => {
+        const processedData = data.map(product => {
           // Handle different price formats
           let price = product.price;
           if (typeof price === 'string') {
@@ -77,12 +78,12 @@ const App = () => {
         console.error('Error fetching products:', error);
         // Fallback data for demo
         const fallbackData = [
-          { id: 1, name: 'Coca-Cola', price: 2.99, stock: 15, category: 'drinks', image: 'https://via.placeholder.com/200x200/FF0000/FFFFFF?text=Coke' },
-          { id: 2, name: 'Apple', price: 0.99, stock: 8, category: 'fruit', image: 'https://via.placeholder.com/200x200/FF6B6B/FFFFFF?text=Apple' },
-          { id: 3, name: 'Croissant', price: 1.49, stock: 12, category: 'bakery', image: 'https://via.placeholder.com/200x200/F4A261/FFFFFF?text=Croissant' },
-          { id: 4, name: 'Coffee', price: 3.99, stock: 20, category: 'drinks', image: 'https://via.placeholder.com/200x200/8B4513/FFFFFF?text=Coffee' },
-          { id: 5, name: 'Banana', price: 0.79, stock: 5, category: 'fruit', image: 'https://via.placeholder.com/200x200/FFE135/000000?text=Banana' },
-          { id: 6, name: 'Bread', price: 2.29, stock: 18, category: 'bakery', image: 'https://via.placeholder.com/200x200/DEB887/000000?text=Bread' }
+          { id: 1, name: 'Coca-Cola', price: 2.99, stock: 15, category: 'drinks', image: 'https://placehold.co/200x200/FF0000/FFFFFF?text=Coke' },
+          { id: 2, name: 'Apple', price: 0.99, stock: 8, category: 'fruit', image: 'https://placehold.co/200x200/FF6B6B/FFFFFF?text=Apple' },
+          { id: 3, name: 'Croissant', price: 1.49, stock: 12, category: 'bakery', image: 'https://placehold.co/200x200/F4A261/FFFFFF?text=Croissant' },
+          { id: 4, name: 'Coffee', price: 3.99, stock: 20, category: 'drinks', image: 'https://placehold.co/200x200/8B4513/FFFFFF?text=Coffee' },
+          { id: 5, name: 'Banana', price: 0.79, stock: 5, category: 'fruit', image: 'https://placehold.co/200x200/FFE135/000000?text=Banana' },
+          { id: 6, name: 'Bread', price: 2.29, stock: 18, category: 'bakery', image: 'https://placehold.co/200x200/DEB887/000000?text=Bread' }
         ];
         setProducts(fallbackData);
         setFilteredProducts(fallbackData);
@@ -102,11 +103,12 @@ const App = () => {
     setFilteredProducts(filtered);
   }, [searchTerm, products]);
 
-  // Calculate offers and totals
+  // Enhanced offer calculation with better product matching
   const calculateCartDetails = () => {
     let subtotal = 0;
     let freeItems = [];
     let totalDiscount = 0;
+    let appliedOffers = [];
 
     // Calculate base subtotal
     Object.entries(cart).forEach(([productId, quantity]) => {
@@ -117,42 +119,79 @@ const App = () => {
       }
     });
 
-    // Apply offers
+    // Apply offers with improved product matching
     Object.entries(cart).forEach(([productId, quantity]) => {
       const product = products.find(p => p.id.toString() === productId);
       if (!product) return;
 
       const price = getSafePrice(product.price);
 
-      // Buy 6 Coca-Cola, get 1 free
-      if (product.name.toLowerCase().includes('coca-cola') && quantity >= 6) {
-        const freeQuantity = Math.floor(quantity / 6);
-        freeItems.push({ ...product, price, freeQuantity, reason: 'Buy 6 Coca-Cola, get 1 free' });
-        totalDiscount += price * freeQuantity;
+      // Offer 1: Buy 6 Coca-Cola, get 1 free (more flexible matching)
+      if (product.name.toLowerCase().includes('coca') || 
+          product.name.toLowerCase().includes('coke') ||
+          product.name.toLowerCase().includes('cola')) {
+        if (quantity >= 6) {
+          const freeQuantity = Math.floor(quantity / 6);
+          freeItems.push({ 
+            ...product, 
+            price, 
+            freeQuantity, 
+            reason: 'Buy 6 Coca-Cola, get 1 free',
+            offerId: 'coca-cola-offer'
+          });
+          totalDiscount += price * freeQuantity;
+          appliedOffers.push({
+            id: 'coca-cola-offer',
+            description: `Buy 6 Coca-Cola, get ${freeQuantity} free`,
+            discount: price * freeQuantity
+          });
+        }
       }
 
-      // Buy 3 croissants, get free coffee
-      if (product.name.toLowerCase().includes('croissant') && quantity >= 3) {
-        const freeQuantity = Math.floor(quantity / 3);
-        const coffee = products.find(p => p.name.toLowerCase().includes('coffee'));
-        if (coffee) {
-          const coffeePrice = getSafePrice(coffee.price);
-          freeItems.push({ ...coffee, price: coffeePrice, freeQuantity, reason: 'Buy 3 croissants, get free coffee' });
-          totalDiscount += coffeePrice * freeQuantity;
+      // Offer 2: Buy 3 croissants, get free coffee (improved matching)
+      if (product.name.toLowerCase().includes('croissant')) {
+        if (quantity >= 3) {
+          const freeQuantity = Math.floor(quantity / 3);
+          // Find coffee product with better matching
+          const coffee = products.find(p => 
+            p.name.toLowerCase().includes('coffee') || 
+            p.name.toLowerCase().includes('espresso') ||
+            p.name.toLowerCase().includes('cappuccino')
+          );
+          
+          if (coffee) {
+            const coffeePrice = getSafePrice(coffee.price);
+            freeItems.push({ 
+              ...coffee, 
+              price: coffeePrice, 
+              freeQuantity, 
+              reason: 'Buy 3 croissants, get free coffee',
+              offerId: 'croissant-coffee-offer'
+            });
+            totalDiscount += coffeePrice * freeQuantity;
+            appliedOffers.push({
+              id: 'croissant-coffee-offer',
+              description: `Buy 3 croissants, get ${freeQuantity} free coffee`,
+              discount: coffeePrice * freeQuantity
+            });
+          }
         }
       }
     });
 
-    const total = subtotal - totalDiscount;
+    const total = Math.max(0, subtotal - totalDiscount); // Ensure total doesn't go negative
 
-    return { subtotal, freeItems, totalDiscount, total };
+    return { subtotal, freeItems, totalDiscount, total, appliedOffers };
   };
 
   const addToCart = (productId) => {
-    setCart(prev => ({
-      ...prev,
-      [productId]: (prev[productId] || 0) + 1
-    }));
+    const product = products.find(p => p.id.toString() === productId);
+    if (product && product.stock > 0) {
+      setCart(prev => ({
+        ...prev,
+        [productId]: (prev[productId] || 0) + 1
+      }));
+    }
   };
 
   const removeFromCart = (productId) => {
@@ -182,6 +221,40 @@ const App = () => {
 
   const getStockDisplay = (stock) => {
     return stock >= 10 ? 'Available' : `${stock} left`;
+  };
+
+  // Check if product qualifies for offers
+  const getProductOfferInfo = (product) => {
+    const quantity = cart[product.id] || 0;
+    const offers = [];
+
+    // Coca-Cola offer
+    if (product.name.toLowerCase().includes('coca') || 
+        product.name.toLowerCase().includes('coke') ||
+        product.name.toLowerCase().includes('cola')) {
+      const needed = 6 - (quantity % 6);
+      if (quantity >= 6) {
+        offers.push({ type: 'active', text: `${Math.floor(quantity / 6)} FREE items applied!` });
+      } else if (quantity > 0) {
+        offers.push({ type: 'progress', text: `Buy ${needed} more for 1 FREE` });
+      } else {
+        offers.push({ type: 'available', text: 'Buy 6, get 1 FREE' });
+      }
+    }
+
+    // Croissant offer
+    if (product.name.toLowerCase().includes('croissant')) {
+      const needed = 3 - (quantity % 3);
+      if (quantity >= 3) {
+        offers.push({ type: 'active', text: `${Math.floor(quantity / 3)} FREE coffee applied!` });
+      } else if (quantity > 0) {
+        offers.push({ type: 'progress', text: `Buy ${needed} more for FREE coffee` });
+      } else {
+        offers.push({ type: 'available', text: 'Buy 3, get FREE coffee' });
+      }
+    }
+
+    return offers;
   };
 
   const SearchResultsPage = () => (
@@ -250,6 +323,24 @@ const App = () => {
           </div>
         </div>
 
+        {/* Active Offers Banner */}
+        <div className="bg-gradient-to-r from-orange-400 to-pink-500 rounded-2xl shadow-xl p-6 mb-8 text-white">
+          <div className="flex items-center space-x-3 mb-4">
+            <Gift className="w-8 h-8" />
+            <h2 className="text-2xl font-bold">Special Offers Available!</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white/20 rounded-xl p-4 backdrop-blur-sm">
+              <h3 className="font-bold text-lg mb-2">🥤 Coca-Cola Deal</h3>
+              <p>Buy 6 cans of Coca-Cola and get 1 absolutely FREE!</p>
+            </div>
+            <div className="bg-white/20 rounded-xl p-4 backdrop-blur-sm">
+              <h3 className="font-bold text-lg mb-2">🥐 Breakfast Combo</h3>
+              <p>Buy 3 croissants and get a FREE coffee to go with it!</p>
+            </div>
+          </div>
+        </div>
+
         {/* Products Grid */}
         {loading ? (
           <div className="flex justify-center items-center h-64">
@@ -257,63 +348,105 @@ const App = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {filteredProducts.map(product => (
-              <div key={product.id} className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-gray-100 overflow-hidden">
-                <div className="relative">
-                  <img
-                    src={product.image || `https://via.placeholder.com/300x200/6366F1/FFFFFF?text=${encodeURIComponent(product.name)}`}
-                    alt={product.name}
-                    className="w-full h-48 object-cover"
-                  />
-                  <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-sm font-semibold ${
-                    product.stock >= 10 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
-                  }`}>
-                    {getStockDisplay(product.stock)}
-                  </div>
-                </div>
-                
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">{product.name}</h3>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-2xl font-bold text-purple-600">
-                      ${getSafePrice(product.price).toFixed(2)}
-                    </span>
-                    <div className="flex items-center space-x-1">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="text-gray-600 text-sm">4.5</span>
+            {filteredProducts.map(product => {
+              const offers = getProductOfferInfo(product);
+              const isOutOfStock = product.stock === 0;
+              const quantity = cart[product.id] || 0;
+              
+              return (
+                <div key={product.id} className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-gray-100 overflow-hidden">
+                  <div className="relative">
+                    <img
+                      src={product.image || `https://placehold.co/300x200/6366F1/FFFFFF?text=${encodeURIComponent(product.name)}`}
+                      alt={product.name}
+                      className={`w-full h-48 object-cover ${isOutOfStock ? 'grayscale opacity-50' : ''}`}
+                    />
+                    <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-sm font-semibold ${
+                      isOutOfStock ? 'bg-red-100 text-red-800' :
+                      product.stock >= 10 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                    }`}>
+                      {isOutOfStock ? 'Out of Stock' : getStockDisplay(product.stock)}
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    {cart[product.id] ? (
-                      <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => removeFromCart(product.id)}
-                          className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200 transition-colors"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <span className="font-bold text-lg min-w-[2rem] text-center">{cart[product.id]}</span>
-                        <button
-                          onClick={() => addToCart(product.id)}
-                          className="bg-green-100 text-green-600 p-2 rounded-full hover:bg-green-200 transition-colors"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
+                    
+                    {/* Offer badges */}
+                    {offers.length > 0 && (
+                      <div className="absolute top-4 left-4">
+                        {offers.map((offer, index) => (
+                          <div key={index} className={`px-2 py-1 rounded-full text-xs font-bold mb-1 ${
+                            offer.type === 'active' ? 'bg-green-500 text-white animate-pulse' :
+                            offer.type === 'progress' ? 'bg-yellow-500 text-white' :
+                            'bg-blue-500 text-white'
+                          }`}>
+                            <Gift className="w-3 h-3 inline mr-1" />
+                            {offer.type === 'active' ? 'OFFER ACTIVE!' : 
+                             offer.type === 'progress' ? 'ALMOST THERE!' : 'OFFER'}
+                          </div>
+                        ))}
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => addToCart(product.id)}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-300 flex items-center space-x-2 shadow-lg hover:shadow-xl"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Add to Cart</span>
-                      </button>
                     )}
                   </div>
+                  
+                  <div className="p-6">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">{product.name}</h3>
+                    
+                    {/* Offer details */}
+                    {offers.length > 0 && (
+                      <div className="mb-3">
+                        {offers.map((offer, index) => (
+                          <p key={index} className={`text-sm font-semibold ${
+                            offer.type === 'active' ? 'text-green-600' :
+                            offer.type === 'progress' ? 'text-yellow-600' :
+                            'text-blue-600'
+                          }`}>
+                            {offer.text}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-2xl font-bold text-purple-600">
+                        ${getSafePrice(product.price).toFixed(2)}
+                      </span>
+                      <div className="flex items-center space-x-1">
+                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                        <span className="text-gray-600 text-sm">4.5</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      {quantity > 0 ? (
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => removeFromCart(product.id)}
+                            className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200 transition-colors"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <span className="font-bold text-lg min-w-[2rem] text-center">{quantity}</span>
+                          <button
+                            onClick={() => addToCart(product.id)}
+                            disabled={isOutOfStock || quantity >= product.stock}
+                            className="bg-green-100 text-green-600 p-2 rounded-full hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => addToCart(product.id)}
+                          disabled={isOutOfStock}
+                          className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-300 flex items-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>{isOutOfStock ? 'Out of Stock' : 'Add to Cart'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -329,7 +462,7 @@ const App = () => {
   );
 
   const CheckoutPage = () => {
-    const { subtotal, freeItems, totalDiscount, total } = calculateCartDetails();
+    const { subtotal, freeItems, totalDiscount, total, appliedOffers } = calculateCartDetails();
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-100">
@@ -367,8 +500,9 @@ const App = () => {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Cart Items */}
-              <div className="lg:col-span-2">
-                <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+              <div className="lg:col-span-2 space-y-6">
+                {/* Regular Cart Items */}
+                <div className="bg-white rounded-2xl shadow-xl p-6">
                   <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
                     <ShoppingCart className="w-6 h-6 mr-3" />
                     Cart Items
@@ -382,7 +516,7 @@ const App = () => {
                       return (
                         <div key={productId} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl">
                           <img
-                            src={product.image || `https://via.placeholder.com/80x80/6366F1/FFFFFF?text=${encodeURIComponent(product.name)}`}
+                            src={product.image || `https://placehold.co/80x80/6366F1/FFFFFF?text=${encodeURIComponent(product.name)}`}
                             alt={product.name}
                             className="w-16 h-16 rounded-lg object-cover"
                           />
@@ -418,29 +552,58 @@ const App = () => {
                   </div>
                 </div>
 
+                {/* Applied Offers Summary */}
+                {appliedOffers.length > 0 && (
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl shadow-xl p-6 border-2 border-green-200">
+                    <h2 className="text-2xl font-bold text-green-700 mb-4 flex items-center">
+                      <Sparkles className="w-6 h-6 mr-3" />
+                      Applied Offers
+                    </h2>
+                    
+                    <div className="space-y-3">
+                      {appliedOffers.map((offer, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-white rounded-xl border border-green-200">
+                          <div className="flex items-center space-x-3">
+                            <div className="bg-green-500 text-white p-2 rounded-full">
+                              <Gift className="w-4 h-4" />
+                            </div>
+                            <span className="font-semibold text-gray-800">{offer.description}</span>
+                          </div>
+                          <span className="font-bold text-green-600">-${offer.discount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Free Items */}
                 {freeItems.length > 0 && (
                   <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl shadow-xl p-6 border-2 border-green-200">
                     <h2 className="text-2xl font-bold text-green-700 mb-6 flex items-center">
-                      <Sparkles className="w-6 h-6 mr-3" />
-                      Free Items Applied!
+                      <Gift className="w-6 h-6 mr-3" />
+                      Free Items Added!
                     </h2>
                     
                     <div className="space-y-4">
                       {freeItems.map((item, index) => (
-                        <div key={index} className="flex items-center space-x-4 p-4 bg-white rounded-xl border border-green-200">
-                          <img
-                            src={item.image || `https://via.placeholder.com/60x60/10B981/FFFFFF?text=FREE`}
-                            alt={item.name}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
+                        <div key={index} className="flex items-center space-x-4 p-4 bg-white rounded-xl border-2 border-green-300 shadow-md">
+                          <div className="relative">
+                            <img
+                              src={item.image || `https://placehold.co/60x60/10B981/FFFFFF?text=FREE`}
+                              alt={item.name}
+                              className="w-12 h-12 rounded-lg object-cover"
+                            />
+                            <div className="absolute -top-1 -right-1 bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                              FREE
+                            </div>
+                          </div>
                           <div className="flex-1">
                             <h3 className="font-semibold text-gray-800">{item.name} (FREE)</h3>
                             <p className="text-sm text-green-600">{item.reason}</p>
                           </div>
                           <div className="text-right">
                             <p className="font-bold text-green-600">Qty: {item.freeQuantity}</p>
-                            <p className="text-sm text-gray-500 line-through">{(item.price * item.freeQuantity).toFixed(2)}</p>
+                            <p className="text-sm text-gray-500 line-through">${(item.price * item.freeQuantity).toFixed(2)}</p>
                           </div>
                         </div>
                       ))}
