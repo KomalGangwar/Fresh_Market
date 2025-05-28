@@ -78,7 +78,7 @@ Fresh_Market/
 ```
 ## Screenshots
 
-![App Screenshot](/src/assets/Screemshot(10).png)
+![App Screenshot](/src/assets/Screemshot(10).png?raw=true)
 
 
 ## Future Improvements
