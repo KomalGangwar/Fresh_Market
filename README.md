@@ -78,7 +78,6 @@ Fresh_Market/
 ```
 ## Screenshots
 
-![App Screenshot](https://github.com/KomalGangwar/Fresh_Market/blob/5c8fe2b209d3ef8a9dc31c1c8b7d852d04be2292/src/assets/Screenshot%20(9).png)
 ![App Screenshot](https://github.com/KomalGangwar/Fresh_Market/blob/12ba198af6411b536e3de7837be162b3fedc3b1b/src/assets/Screenshot%20(13).png)
 ![App Screenshot](https://github.com/KomalGangwar/Fresh_Market/blob/12ba198af6411b536e3de7837be162b3fedc3b1b/src/assets/Screenshot%20(11).png)
 
