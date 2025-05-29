@@ -25,8 +25,12 @@ const App = () => {
         const response = await fetch(`https://uxdlyqjm9i.execute-api.eu-west-1.amazonaws.com/s?category=${selectedCategory}`);
         const data = await response.json();
         
+        console.log('Raw API Response:', data); // Debug log to see actual API structure
+        
         // Ensure all numeric fields are properly converted
         const processedData = data.map(product => {
+          console.log('Processing product:', product); // Debug individual product
+          
           // Handle different price formats
           let price = product.price;
           if (typeof price === 'string') {
@@ -38,13 +42,34 @@ const App = () => {
             price = 0.00;
           }
 
-          let stock = product.stock;
+          // FIXED: Handle stock with multiple possible field names and better parsing
+          let stock = product.stock || product.inventory || product.quantity || product.available || product.inStock;
+          
+          // Handle different stock formats from API
           if (typeof stock === 'string') {
-            stock = parseInt(stock);
+            // Handle string representations like "10", "available", "in stock", etc.
+            if (stock.toLowerCase().includes('out') || stock.toLowerCase().includes('unavailable')) {
+              stock = 0;
+            } else if (stock.toLowerCase().includes('available') || stock.toLowerCase().includes('in stock')) {
+              stock = 10; // Default to 10 if marked as available
+            } else {
+              // Try to parse as number
+              const parsedStock = parseInt(stock);
+              stock = isNaN(parsedStock) ? 10 : parsedStock; // Default to 10 if can't parse
+            }
+          } else if (typeof stock === 'boolean') {
+            // Handle boolean stock (true/false)
+            stock = stock ? 10 : 0;
+          } else if (typeof stock === 'number') {
+            // Already a number, just ensure it's valid
+            stock = isNaN(stock) ? 10 : Math.max(0, stock);
+          } else {
+            // If stock is null, undefined, or any other type, default to available
+            stock = 10;
           }
-          if (isNaN(stock) || stock === null || stock === undefined) {
-            stock = 0;
-          }
+
+          // Ensure stock is never negative
+          stock = Math.max(0, stock);
 
           // Handle image URLs - check multiple possible fields
           let imageUrl = product.image || product.imageUrl || product.img || product.picture;
@@ -62,21 +87,24 @@ const App = () => {
             imageUrl = `https://placehold.co/300x200/${colorScheme}?text=${encodeURIComponent(product.name || 'Product')}`;
           }
 
-          return {
+          const processedProduct = {
             ...product,
             price: price,
             stock: stock,
             image: imageUrl,
             id: product.id || Math.random().toString(36).substr(2, 9) // Generate ID if missing
           };
+          
+          console.log('Processed product:', processedProduct); // Debug processed product
+          return processedProduct;
         });
         
-        console.log('Processed products:', processedData); // Debug log
+        console.log('All processed products:', processedData); // Debug log
         setProducts(processedData);
         setFilteredProducts(processedData);
       } catch (error) {
         console.error('Error fetching products:', error);
-        // Fallback data for demo
+        // Fallback data for demo with proper stock values
         const fallbackData = [
           { id: 1, name: 'Coca-Cola', price: 2.99, stock: 15, category: 'drinks', image: 'https://placehold.co/200x200/FF0000/FFFFFF?text=Coke' },
           { id: 2, name: 'Apple', price: 0.99, stock: 8, category: 'fruit', image: 'https://placehold.co/200x200/FF6B6B/FFFFFF?text=Apple' },
@@ -184,13 +212,25 @@ const App = () => {
     return { subtotal, freeItems, totalDiscount, total, appliedOffers };
   };
 
+ 
   const addToCart = (productId) => {
-    const product = products.find(p => p.id.toString() === productId);
-    if (product && product.stock > 0) {
+    const product = products.find(p => p.id.toString() === productId.toString());
+    const currentQuantity = cart[productId.toString()] || 0;
+    
+    console.log('Adding to cart:', { productId, product, currentQuantity, stock: product?.stock });
+    
+    if (product && product.stock > 0 && currentQuantity < product.stock) {
       setCart(prev => ({
         ...prev,
-        [productId]: (prev[productId] || 0) + 1
+        [productId.toString()]: currentQuantity + 1
       }));
+      console.log('Successfully added to cart');
+    } else {
+      console.log('Cannot add to cart:', {
+        productExists: !!product,
+        hasStock: product?.stock > 0,
+        belowStockLimit: currentQuantity < (product?.stock || 0)
+      });
     }
   };
 
@@ -219,8 +259,16 @@ const App = () => {
     return Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
   };
 
+  // FIXED: Improved stock display function
   const getStockDisplay = (stock) => {
-    return stock >= 10 ? 'Available' : `${stock} left`;
+    if (stock <= 0) return 'Out of Stock';
+    if (stock >= 10) return 'In Stock';
+    return `${stock} left`;
+  };
+
+  // FIXED: Better stock status checking
+  const isProductInStock = (product) => {
+    return product.stock > 0;
   };
 
   // Check if product qualifies for offers
@@ -350,8 +398,10 @@ const App = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {filteredProducts.map(product => {
               const offers = getProductOfferInfo(product);
-              const isOutOfStock = product.stock === 0;
+              const isOutOfStock = !isProductInStock(product); // FIXED: Use the new function
               const quantity = cart[product.id] || 0;
+              
+              console.log(`Product ${product.name}: stock=${product.stock}, isOutOfStock=${isOutOfStock}`); // Debug log
               
               return (
                 <div key={product.id} className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-gray-100 overflow-hidden">
@@ -361,11 +411,12 @@ const App = () => {
                       alt={product.name}
                       className={`w-full h-48 object-cover ${isOutOfStock ? 'grayscale opacity-50' : ''}`}
                     />
+                    {/* FIXED: Better stock status display */}
                     <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-sm font-semibold ${
                       isOutOfStock ? 'bg-red-100 text-red-800' :
                       product.stock >= 10 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
                     }`}>
-                      {isOutOfStock ? 'Out of Stock' : getStockDisplay(product.stock)}
+                      {getStockDisplay(product.stock)}
                     </div>
                     
                     {/* Offer badges */}
@@ -388,6 +439,11 @@ const App = () => {
                   
                   <div className="p-6">
                     <h3 className="text-xl font-bold text-gray-800 mb-2">{product.name}</h3>
+                    
+                    {/* Debug info - remove in production */}
+                    <div className="text-xs text-gray-400 mb-2">
+                      Stock: {product.stock} | In Stock: {isProductInStock(product).toString()}
+                    </div>
                     
                     {/* Offer details */}
                     {offers.length > 0 && (
